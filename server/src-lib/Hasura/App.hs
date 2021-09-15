@@ -57,7 +57,6 @@ import qualified Hasura.Tracing                             as Tracing
 import           Data.IORef                                 (readIORef)
 import           Hasura.Backends.Postgres.Connection
 import           Hasura.Base.Error
-import           Hasura.EncJSON
 import           Hasura.Eventing.Common
 import           Hasura.Eventing.EventTrigger
 import           Hasura.Eventing.ScheduledTrigger
@@ -77,7 +76,7 @@ import           Hasura.RQL.DDL.Schema.Cache.Common
 import           Hasura.RQL.DDL.Schema.Catalog
 import           Hasura.RQL.Types
 import           Hasura.RQL.Types.Run
-import           Hasura.Server.API.Query                    (requiresAdmin, runQueryM)
+import           Hasura.Server.API.Query                    (requiresAdmin)
 import           Hasura.Server.App
 import           Hasura.Server.Auth
 import           Hasura.Server.CheckUpdates                 (checkForUpdates)
@@ -132,8 +131,6 @@ parseHGECommand =
           ( progDesc "Export graphql-engine's metadata to stdout" ))
         <> command "clean" (info (pure  HCClean)
           ( progDesc "Clean graphql-engine's metadata to start afresh" ))
-        <> command "execute" (info (pure  HCExecute)
-          ( progDesc "Execute a query" ))
         <> command "downgrade" (info (HCDowngrade <$> downgradeOptionsParser)
           (progDesc "Downgrade the GraphQL Engine schema to the specified version"))
         <> command "version" (info (pure  HCVersion)
@@ -826,30 +823,6 @@ runAsAdmin httpManager serverConfigCtx m = do
   let runCtx = RunCtx adminUserInfo httpManager serverConfigCtx
   runExceptT $ peelRun runCtx m
 
-execQuery
-  :: ( HasVersion
-     , CacheRWM m
-     , MonadIO m
-     , MonadBaseControl IO m
-     , MonadUnique m
-     , HasHttpManagerM m
-     , UserInfoM m
-     , Tracing.MonadTrace m
-     , HasServerConfigCtx m
-     , MetadataM m
-     , MonadMetadataStorageQueryAPI m
-     , EB.MonadQueryTags m
-     )
-  => Env.Environment
-  -> BLC.ByteString
-  -> m BLC.ByteString
-execQuery env queryBs = do
-  query <- case A.decode queryBs of
-    Just jVal -> decodeValue jVal
-    Nothing   -> throw400 InvalidJSON "invalid json"
-  buildSchemaCacheStrict
-  encJToLBS <$> runQueryM env query
-
 instance (Monad m) => Tracing.HasReporter (PGMetadataStorageAppT m)
 
 instance (Monad m) => HasResourceLimits (PGMetadataStorageAppT m) where
@@ -867,9 +840,9 @@ instance (MonadIO m) => HttpLog (PGMetadataStorageAppT m) where
     unLogger logger $ mkHttpLog $
       mkHttpErrorLogContext userInfoM enabledLogTypes reqId waiReq req qErr Nothing Nothing headers
 
-  logHttpSuccess logger enabledLogTypes userInfoM reqId waiReq reqBody _response compressedResponse qTime cType headers (CommonHttpLogMetadata rb, ()) =
+  logHttpSuccess logger enabledLogTypes userInfoM reqId waiReq reqBody _response compressedResponse qTime cType headers (CommonHttpLogMetadata rb batchQueryOpLogs, ()) =
     unLogger logger $ mkHttpLog $
-      mkHttpAccessLogContext userInfoM enabledLogTypes reqId waiReq reqBody compressedResponse qTime cType headers rb
+      mkHttpAccessLogContext userInfoM enabledLogTypes reqId waiReq reqBody compressedResponse qTime cType headers rb batchQueryOpLogs
 
 instance (Monad m) => MonadExecuteQuery (PGMetadataStorageAppT m) where
   cacheLookup _ _ _ _ = pure ([], Nothing)
@@ -989,7 +962,8 @@ instance {-# OVERLAPPING #-} MonadIO m => MonadMetadataStorage (MetadataStorageT
 
   getDeprivedCronTriggerStats        = runInSeparateTx . getDeprivedCronTriggerStatsTx
   getScheduledEventsForDelivery      = runInSeparateTx getScheduledEventsForDeliveryTx
-  insertScheduledEvent               = runInSeparateTx . insertScheduledEventTx
+  insertCronEvents                   = runInSeparateTx . insertCronEventsTx
+  insertOneOffScheduledEvent         = runInSeparateTx . insertOneOffScheduledEventTx
   insertScheduledEventInvocation a b = runInSeparateTx $ insertInvocationTx a b
   setScheduledEventOp a b c          = runInSeparateTx $ setScheduledEventOpTx a b c
   unlockScheduledEvents a b          = runInSeparateTx $ unlockScheduledEventsTx a b

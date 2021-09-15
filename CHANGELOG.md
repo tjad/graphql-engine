@@ -3,6 +3,20 @@
 ## Next release
 
 (Add entries below in the order of server, console, cli, docs, others)
+- server: support MSSQL transactions
+- server: log individual operation details in the http-log during a batch graphQL query execution
+- console: support tracking of functions with return a single row
+- server: update `create_scheduled_event` API to return `event_id` in response
+
+- server: fix bug which allowed inconsistent metadata to exist after the `replace_metadata` API even though `allow_inconsistent_object` is set to `false`.
+
+## v2.0.9
+
+- server: disable mutation for materialised views (#6688)
+- server: set `tracecontext` and `userInfo` for DML actions on Postgres sources
+- server: add support for `connection_parameters` on `pg_add_source` API
+- cli: add progress bar for `migrate apply` command (#4795)
+- cli: embed cli-ext for windows binaries (#7509)
 
 ## v2.0.8
 
@@ -15,7 +29,7 @@
 - console: support insecure TLS allowlist
 - console: support computed fields in remote schema join
 - console: fix data sidebar not updated when a table is renamed
-- cli: fix delay starting console using `hasura console` (#7255
+- cli: fix delay starting console using `hasura console` (#7255)
 
 ## v2.0.7
 

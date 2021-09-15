@@ -141,8 +141,6 @@ data APIResp
   = JSONResp !(HttpResponse EncJSON)
   | RawResp  !(HttpResponse BL.ByteString)
 
-type ReqsText = GH.GQLBatchedReqs GH.GQLQueryText
-
 -- | API request handlers for different endpoints
 data APIHandler m a where
   -- | A simple GET request
@@ -152,7 +150,7 @@ data APIHandler m a where
   -- | A general GraphQL request (query or mutation) for which the content of the query
   -- is made available to the handler for authentication.
   -- This is a more specific version of the 'AHPost' constructor.
-  AHGraphQLRequest :: !(ReqsText -> Handler m (HttpLogMetadata m, APIResp)) -> APIHandler m ReqsText
+  AHGraphQLRequest :: !(GH.ReqsText -> Handler m (HttpLogMetadata m, APIResp)) -> APIHandler m GH.ReqsText
 
 boolToText :: Bool -> Text
 boolToText = bool "false" "true"
@@ -210,7 +208,7 @@ mkGetHandler = AHGet
 mkPostHandler :: (a -> Handler m (HttpLogMetadata m, APIResp)) -> APIHandler m a
 mkPostHandler = AHPost
 
-mkGQLRequestHandler :: (ReqsText -> Handler m (HttpLogMetadata m, APIResp)) -> APIHandler m ReqsText
+mkGQLRequestHandler :: (GH.ReqsText -> Handler m (HttpLogMetadata m, APIResp)) -> APIHandler m GH.ReqsText
 mkGQLRequestHandler = AHGraphQLRequest
 
 mkAPIRespHandler :: (Functor m) => (a -> Handler m (HttpResponse EncJSON)) -> (a -> Handler m APIResp)
@@ -443,10 +441,10 @@ v1QueryHandler query = do
   (liftEitherM . authorizeV1QueryApi query) =<< ask
   scRef  <- asks (scCacheRef . hcServerCtx)
   logger <- asks (scLogger . hcServerCtx)
-  res    <- bool (fst <$> action) (withSCUpdate scRef logger Nothing action) $ queryModifiesSchemaCache query
+  res    <- bool (fst <$> (action logger)) (withSCUpdate scRef logger Nothing (action logger)) $ queryModifiesSchemaCache query
   return $ HttpResponse res []
   where
-    action = do
+    action logger = do
       userInfo             <- asks hcUser
       scRef                <- asks (scCacheRef . hcServerCtx)
       schemaCache          <- fmap fst $ liftIO $ readIORef $ _scrCache scRef
@@ -459,7 +457,7 @@ v1QueryHandler query = do
       maintenanceMode      <- asks (scEnableMaintenanceMode . hcServerCtx)
       experimentalFeatures <- asks (scExperimentalFeatures . hcServerCtx)
       let serverConfigCtx = ServerConfigCtx functionPermsCtx remoteSchemaPermsCtx sqlGenCtx maintenanceMode experimentalFeatures
-      runQuery env instanceId userInfo schemaCache httpMgr
+      runQuery env logger instanceId userInfo schemaCache httpMgr
                serverConfigCtx query
 
 v1MetadataHandler
@@ -550,7 +548,7 @@ v1Alpha1GQHandler
      , MonadMetadataStorage (MetadataStorageT m)
      , EB.MonadQueryTags m
      )
-  => E.GraphQLQueryType -> GH.GQLBatchedReqs GH.GQLQueryText
+  => E.GraphQLQueryType -> GH.GQLBatchedReqs (GH.GQLReq GH.GQLQueryText)
   -> m (HttpLogMetadata m, HttpResponse EncJSON)
 v1Alpha1GQHandler queryType query = do
   userInfo             <- asks hcUser
@@ -600,7 +598,7 @@ v1GQHandler
      , MonadMetadataStorage (MetadataStorageT m)
      , EB.MonadQueryTags m
      )
-  => GH.GQLBatchedReqs GH.GQLQueryText
+  => GH.GQLBatchedReqs (GH.GQLReq GH.GQLQueryText)
   -> m (HttpLogMetadata m, HttpResponse EncJSON)
 v1GQHandler = v1Alpha1GQHandler E.QueryHasura
 
@@ -618,7 +616,7 @@ v1GQRelayHandler
      , MonadMetadataStorage (MetadataStorageT m)
      , EB.MonadQueryTags m
      )
-  => GH.GQLBatchedReqs GH.GQLQueryText
+  => GH.GQLBatchedReqs (GH.GQLReq GH.GQLQueryText)
   -> m (HttpLogMetadata m, HttpResponse EncJSON)
 v1GQRelayHandler = v1Alpha1GQHandler E.QueryRelay
 

@@ -10,21 +10,21 @@ module Hasura.RQL.DDL.ScheduledTrigger
   , populateInitialCronTriggerEvents
   ) where
 
-import           System.Cron.Types                  (CronSchedule)
+import           System.Cron.Types                (CronSchedule)
 
 import           Hasura.Prelude
 
-import qualified Data.Aeson                         as J
-import qualified Data.Environment                   as Env
-import qualified Data.HashMap.Strict                as Map
-import qualified Data.HashMap.Strict.InsOrd         as OMap
-import qualified Data.Time.Clock                    as C
+import qualified Data.Aeson                       as J
+import qualified Data.Environment                 as Env
+import qualified Data.HashMap.Strict              as Map
+import qualified Data.HashMap.Strict.InsOrd       as OMap
+import qualified Data.Time.Clock                  as C
 
-import           Hasura.Backends.Postgres.DDL.Table (getHeaderInfosFromConf)
 import           Hasura.Base.Error
 import           Hasura.EncJSON
 import           Hasura.Eventing.ScheduledTrigger
 import           Hasura.Metadata.Class
+import           Hasura.RQL.DDL.EventTrigger      (getHeaderInfosFromConf)
 import           Hasura.RQL.Types
 
 populateInitialCronTriggerEvents
@@ -37,7 +37,7 @@ populateInitialCronTriggerEvents
 populateInitialCronTriggerEvents schedule triggerName = do
   currentTime <- liftIO C.getCurrentTime
   let scheduleTimes = generateScheduleTimes currentTime 100 schedule
-  createScheduledEvent $ SESCron $ map (CronEventSeed triggerName) scheduleTimes
+  insertCronEvents $ map (CronEventSeed triggerName) scheduleTimes
   pure ()
 
 -- | runCreateCronTrigger will update a existing cron trigger when the 'replace'
@@ -111,7 +111,7 @@ updateCronTrigger cronTriggerMetadata = do
   dropFutureCronEvents $ SingleCronTrigger triggerName
   currentTime <- liftIO C.getCurrentTime
   let scheduleTimes = generateScheduleTimes currentTime 100 $ ctSchedule cronTriggerMetadata
-  createScheduledEvent $ SESCron $ map (CronEventSeed triggerName) scheduleTimes
+  insertCronEvents $ map (CronEventSeed triggerName) scheduleTimes
   pure successMsg
 
 runDeleteCronTrigger
@@ -136,8 +136,8 @@ runCreateScheduledEvent
   :: ( MonadMetadataStorageQueryAPI m  )
   => CreateScheduledEvent -> m EncJSON
 runCreateScheduledEvent scheduledEvent = do
-  createScheduledEvent $ SESOneOff scheduledEvent
-  pure successMsg
+  eid <- createOneOffScheduledEvent scheduledEvent
+  pure $ encJFromJValue $ J.object [ "message" J..= J.String "success", "event_id" J..= eid ]
 
 checkExists :: (CacheRM m, MonadError QErr m) => TriggerName -> m ()
 checkExists name = do

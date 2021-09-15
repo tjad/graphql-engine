@@ -18,16 +18,12 @@ instance BackendAPI ('Postgres 'Vanilla) where
     , functionPermissionsCommands @('Postgres 'Vanilla)
     , relationshipCommands        @('Postgres 'Vanilla)
     , remoteRelationshipCommands  @('Postgres 'Vanilla)
+    , eventTriggerCommands        @('Postgres 'Vanilla)
     -- postgres specific
     , [ commandParser "set_table_is_enum"    RMPgSetTableIsEnum
 
       , commandParser "add_computed_field"   RMAddComputedField
       , commandParser "drop_computed_field"  RMDropComputedField
-
-      , commandParser "create_event_trigger" RMPgCreateEventTrigger
-      , commandParser "delete_event_trigger" RMPgDeleteEventTrigger
-      , commandParser "redeliver_event"      RMPgRedeliverEvent
-      , commandParser "invoke_event_trigger" RMPgInvokeEventTrigger
       ]
     ]
 

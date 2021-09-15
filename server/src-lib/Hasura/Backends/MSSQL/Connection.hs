@@ -167,3 +167,6 @@ instance Cacheable MSSQLSourceConfig where
 
 instance ToJSON MSSQLSourceConfig where
   toJSON = toJSON . _mscConnectionString
+
+newtype MSSQLConnErr = MSSQLConnErr { getConnErr :: Text }
+  deriving (Show, Eq, ToJSON)

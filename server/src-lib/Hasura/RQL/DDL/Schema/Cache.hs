@@ -58,6 +58,7 @@ import           Hasura.GraphQL.Schema                    (buildGQLContext)
 import           Hasura.Metadata.Class
 import           Hasura.RQL.DDL.Action
 import           Hasura.RQL.DDL.CustomTypes
+import           Hasura.RQL.DDL.EventTrigger              (buildEventTriggerInfo)
 import           Hasura.RQL.DDL.InheritedRoles            (resolveInheritedRole)
 import           Hasura.RQL.DDL.RemoteRelationship        (PartiallyResolvedSource (..))
 import           Hasura.RQL.DDL.RemoteSchema
@@ -728,7 +729,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
     mkEventTriggerMetadataObject
       :: forall b a c
        . Backend b
-      => (a, SourceName, c, TableName b, RecreateEventTriggers, EventTriggerConf)
+      => (a, SourceName, c, TableName b, RecreateEventTriggers, EventTriggerConf b)
       -> MetadataObject
     mkEventTriggerMetadataObject (_, source, _, table, _, eventTriggerConf) =
       let objectId = MOSourceObjId source
@@ -804,9 +805,9 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
          , Inc.ArrowCache m arr, MonadIO m, MonadError QErr m, MonadBaseControl IO m
          , MonadReader BuildReason m, HasServerConfigCtx m, BackendMetadata b)
       => ( SourceName, SourceConfig b, TableCoreInfo b
-         , [EventTriggerConf], Inc.Dependency Inc.InvalidationKey
+         , [EventTriggerConf b], Inc.Dependency Inc.InvalidationKey
          , RecreateEventTriggers
-         ) `arr` EventTriggerInfoMap
+         ) `arr` (EventTriggerInfoMap b)
     buildTableEventTriggers = proc (source, sourceConfig, tableInfo, eventTriggerConfs, metadataInvalidationKey, recreateEventTriggers) ->
       buildInfoMap (etcName . (^. _6)) (mkEventTriggerMetadataObject @b) buildEventTrigger
         -< (tableInfo, map (metadataInvalidationKey, source, sourceConfig, _tciName tableInfo, recreateEventTriggers, ) eventTriggerConfs)

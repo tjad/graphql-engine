@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Pallinder/go-randomdata"
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/hasura/graphql-engine/cli/v2/internal/testutil"
 	. "github.com/onsi/ginkgo"
@@ -60,8 +61,7 @@ var testMigrateApply = func(projectDirectory string, globalFlags []string) {
 			WorkingDirectory: projectDirectory,
 		})
 		wantKeywordList := []string{
-			"Applying migrations",
-			"applied",
+			"migrations applied",
 		}
 
 		Eventually(session, timeout).Should(Exit(0))
@@ -88,8 +88,7 @@ var testMigrateApplySkipExecution = func(projectDirectory string, globalFlags []
 			WorkingDirectory: projectDirectory,
 		})
 		wantKeywordList := []string{
-			"Applying migrations",
-			"applied",
+			"migrations applied",
 		}
 
 		Eventually(session, timeout).Should(Exit(0))
@@ -105,8 +104,7 @@ var testMigrateApplySkipExecution = func(projectDirectory string, globalFlags []
 			WorkingDirectory: projectDirectory,
 		})
 		wantKeywordList = []string{
-			"Applying migrations",
-			"applied",
+			"migrations applied",
 		}
 
 		Eventually(session, timeout).Should(Exit(0))
@@ -134,6 +132,42 @@ var testMigrateApplySkipExecution = func(projectDirectory string, globalFlags []
 			Expect(session.Wait(timeout).Out).Should(Say(keyword))
 		}
 
+	})
+}
+
+var testProgressBar = func(projectDirectory string) {
+	progressBar := "Applying migrations:  . / 8 .*%"
+	Context("migrate apply should display progress bar", func() {
+		testutil.RunCommandAndSucceed(testutil.CmdOpts{
+			Args:             []string{"migrate", "create", "schema_creation", "--up-sql", "create schema \"testing\";", "--down-sql", "drop schema \"testing\" cascade;"},
+			WorkingDirectory: projectDirectory,
+		})
+		session := testutil.Hasura(testutil.CmdOpts{
+			Args:             []string{"migrate", "apply", "--progressbar-logs"},
+			WorkingDirectory: projectDirectory,
+		})
+		wantKeywordList := []string{
+			progressBar,
+			"migrations applied",
+		}
+
+		Eventually(session, 60*40).Should(Exit(0))
+		for _, keyword := range wantKeywordList {
+			Eventually(session.Err, 60*40).Should(Say(keyword))
+		}
+	})
+	Context("migrate apply shouldn't display progress bar in non-terminal (default behaviour)", func() {
+		session := testutil.Hasura(testutil.CmdOpts{
+			Args:             []string{"migrate", "apply", "--down", "all"},
+			WorkingDirectory: projectDirectory,
+		})
+
+		if !terminal.IsTerminal(int(os.Stdin.Fd())) {
+			Eventually(session.Err, 60*40).ShouldNot(Say(progressBar))
+		} else {
+			Eventually(session.Err, 60*40).Should(Say(progressBar))
+		}
+		Eventually(session, 60*40).Should(Exit(0))
 	})
 }
 
@@ -254,5 +288,30 @@ var _ = Describe("hasura migrate apply (config v3)", func() {
 `, pgSource)
 		createTable := strings.NewReader(createTableString)
 		testByRunningAPI(hgeEndpoint, "v2/query", createTable)
+	})
+})
+
+var _ = Describe("hasura migrate apply progress bar", func() {
+	var projectDirectory string
+	var teardown func()
+	BeforeEach(func() {
+		projectDirectory = testutil.RandDirName()
+		hgeEndPort, teardownHGE := testutil.StartHasura(GinkgoT(), testutil.HasuraDockerImage)
+		hgeEndpoint := fmt.Sprintf("http://0.0.0.0:%s", hgeEndPort)
+		copyTestConfigV2Project(projectDirectory)
+		editEndpointInConfig(filepath.Join(projectDirectory, defaultConfigFilename), hgeEndpoint)
+
+		teardown = func() {
+			os.RemoveAll(projectDirectory)
+			teardownHGE()
+		}
+	})
+
+	AfterEach(func() {
+		teardown()
+	})
+
+	It("test the progress bar of migrate apply", func() {
+		testProgressBar(projectDirectory)
 	})
 })
