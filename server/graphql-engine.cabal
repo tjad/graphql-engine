@@ -72,6 +72,7 @@ common common-all
     RoleAnnotations
     ScopedTypeVariables
     StandaloneDeriving
+    StrictData
     TemplateHaskell
     TupleSections
     TypeApplications
@@ -116,18 +117,21 @@ library
                      , dependent-sum
                      , exceptions
                      , fast-logger
+                     , ghc-heap-view
                      , hashable
                      , hashable-time
                      , http-client-tls
                      , http-conduit
                      , http-types
                      , kan-extensions
+                     , kriti-lang
                      , lifted-base
                      , monad-control
                      , monad-loops
                      , monad-validate
                      , mtl
                      , optparse-applicative
+                     , parsec
                      , pg-client
                      , postgresql-binary
                      , postgresql-libpq
@@ -148,6 +152,7 @@ library
                      , transformers
                      , transformers-base
                      , unordered-containers >= 0.2.12
+                     , url
                      , utf8-string
                      , validation
                      , vector
@@ -283,13 +288,6 @@ library
                      , mysql
                      , mysql-simple
 
-
-  if !flag(profiling)
-    build-depends:
-      -- 0.6.1 is supposedly not okay for ghc 8.6:
-      --   https://github.com/nomeata/ghc-heap-view/issues/27
-      ghc-heap-view
-
   exposed-modules:     Control.Arrow.Extended
                      , Control.Arrow.Trans
                      , Control.Concurrent.Extended
@@ -314,6 +312,7 @@ library
                      , Data.Time.Clock.Units
                      , Data.URL.Template
                      , Database.MSSQL.Transaction
+                     , GHC.AssertNF.CPP
                      , GHC.Stats.Extended
                      , Hasura.App
                      , Hasura.Metadata.Class
@@ -479,8 +478,9 @@ library
                      , Hasura.RQL.Types.CustomTypes
                      , Hasura.RQL.Types.Endpoint
                      , Hasura.RQL.Types.Endpoint.Trie
-                     , Hasura.RQL.Types.Eventing.Backend
                      , Hasura.RQL.Types.EventTrigger
+                     , Hasura.RQL.Types.Eventing
+                     , Hasura.RQL.Types.Eventing.Backend
                      , Hasura.RQL.Types.GraphqlSchemaIntrospection
                      , Hasura.RQL.Types.Function
                      , Hasura.RQL.Types.Instances
@@ -523,6 +523,7 @@ library
                      , Hasura.RQL.DDL.RemoteRelationship.Validate
                      , Hasura.RQL.DDL.RemoteSchema
                      , Hasura.RQL.DDL.RemoteSchema.Permission
+                     , Hasura.RQL.DDL.RequestTransform
                      , Hasura.RQL.DDL.Schema
                      , Hasura.RQL.DDL.Schema.Cache
                      , Hasura.RQL.DDL.Schema.Cache.Common
@@ -638,7 +639,8 @@ library
                      , Hasura.SQL.WKT
                      , Hasura.Tracing
                      , Hasura.QueryTags
-                     , Network.HTTP.Client.Extended
+                     , Network.HTTP.Client.Transformable
+                     , Network.HTTP.Client.Manager
                      , Network.HTTP.Client.DynamicTlsPermissions
                      , Network.URI.Extended
                      , Network.Wai.Extended
@@ -667,16 +669,19 @@ test-suite graphql-engine-tests
       aeson
     , base
     , bytestring
+    , case-insensitive
     , containers
     , cron
     , dependent-map
     , dependent-sum
     , graphql-engine
     , graphql-parser
+    , hedgehog
     , hspec >=2.6.1 && <3
     , hspec-core >=2.6.1 && <3
     , hspec-expectations
     , hspec-expectations-lifted
+    , hspec-hedgehog
     , http-client
     , http-client-tls
     , http-types
@@ -697,6 +702,7 @@ test-suite graphql-engine-tests
     , safe
     , scientific
     , split
+    , stm
     , template-haskell
     , text
     , time
@@ -725,10 +731,13 @@ test-suite graphql-engine-tests
     Hasura.GraphQL.Schema.RemoteTest
     Hasura.IncrementalSpec
     Hasura.RQL.PermissionSpec
+    Hasura.RQL.RequestTransformSpec
+    Hasura.RQL.Types.EndpointSpec
     Hasura.RQL.Types.CommonSpec
     Hasura.RQL.Types.EndpointSpec
     Hasura.Server.AuthSpec
     Hasura.Server.MigrateSpec
     Hasura.Server.TelemetrySpec
+    Network.HTTP.Client.TransformableSpec
     Hasura.SessionSpec
     Hasura.SQL.WKTSpec

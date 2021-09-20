@@ -40,7 +40,7 @@ import qualified Database.PG.Query                           as Q
 import           Control.Lens                                (Traversal', at, preview, (^.))
 import           Control.Monad.Unique
 import           Data.Text.Extended
-import           Network.HTTP.Client.Extended                (HasHttpManagerM (..))
+import           Network.HTTP.Client.Manager                 (HasHttpManagerM (..))
 
 import           Hasura.Backends.Postgres.Connection         as R
 import           Hasura.Base.Error
@@ -54,6 +54,7 @@ import           Hasura.RQL.Types.ComputedField              as R
 import           Hasura.RQL.Types.CustomTypes                as R
 import           Hasura.RQL.Types.Endpoint                   as R
 import           Hasura.RQL.Types.EventTrigger               as R
+import           Hasura.RQL.Types.Eventing                   as R
 import           Hasura.RQL.Types.Function                   as R
 import           Hasura.RQL.Types.GraphqlSchemaIntrospection as R
 import           Hasura.RQL.Types.Metadata                   as R
@@ -179,9 +180,6 @@ instance (HasServerConfigCtx m)
   askServerConfigCtx = lift askServerConfigCtx
 instance (HasServerConfigCtx m)
          => HasServerConfigCtx (MetadataT m) where
-  askServerConfigCtx = lift askServerConfigCtx
-instance (HasServerConfigCtx m)
-         => HasServerConfigCtx (LazyTxT QErr m) where
   askServerConfigCtx = lift askServerConfigCtx
 instance (HasServerConfigCtx m) => HasServerConfigCtx (Q.TxET QErr m) where
   askServerConfigCtx = lift askServerConfigCtx

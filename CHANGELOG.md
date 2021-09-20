@@ -1,17 +1,24 @@
 # Hasura GraphQL Engine Changelog
 
 ## Next release
-
 (Add entries below in the order of server, console, cli, docs, others)
+
+- server: remove identity notion for table columns (fix #7557)
+- server: add webhook transformations for Actions and EventTriggers
 - server: support MSSQL transactions
 - server: log individual operation details in the http-log during a batch graphQL query execution
-- console: support tracking of functions with return a single row
 - server: update `create_scheduled_event` API to return `event_id` in response
-
 - server: fix bug which allowed inconsistent metadata to exist after the `replace_metadata` API even though `allow_inconsistent_object` is set to `false`.
+- server: fix explicit `null` values not allowed in nested object relationship inserts (#7484)
+- server: `introspect_remote_schema` API now returns original remote schema instead of customized schema
+- server: prevent empty subscription roots in the schema (#6898)
+- console: support tracking of functions with return a single row
+
+- server: support `extensions` field in error responses from action webhook endpoints (fix #4001)
 
 ## v2.0.9
 
+- server: fix export_metadata V2 bug which included cron triggers with `include_in_metadata: false`
 - server: disable mutation for materialised views (#6688)
 - server: set `tracecontext` and `userInfo` for DML actions on Postgres sources
 - server: add support for `connection_parameters` on `pg_add_source` API
@@ -102,8 +109,7 @@ generally, JSON-style aggregates.
 - server: Support computed fields in query filter (`where` argument) (close #7100)
 - server: add a `$.detail.operation.request_mode` field to `http-log` which takes the values `"single"` or `"batched"` to log whether a GraphQL request was executed on its own or as part of a batch
 - server: add `query` field to `http-log` and `websocket-log` in non-error cases
-- server: Add global limit to BigQuery via the `global_select_limit`
-  field in the connection configuration
+- server: Add global limit to BigQuery via the `global_select_limit` field in the connection configuration
 - server: include action and event names in log output
 - server: log all HTTP errors in remote schema calls as `remote-schema-error` with details
 - server: For BigQuery, make `global_select_limit` configuration optional with a default value of

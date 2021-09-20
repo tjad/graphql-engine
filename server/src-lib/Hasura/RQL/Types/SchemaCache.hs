@@ -139,6 +139,7 @@ import           Data.Int                                    (Int64)
 import           Data.Text.Extended
 import           System.Cron.Types
 
+import qualified Database.PG.Query                           as Q
 import qualified Hasura.Backends.Postgres.Connection         as PG
 import qualified Hasura.GraphQL.Parser                       as P
 import qualified Hasura.SQL.AnyBackend                       as AB
@@ -247,8 +248,7 @@ data RemoteSchemaCtx
   , _rscIntroOriginal          :: !IntrospectionResult -- ^ Original remote schema without customizations
   , _rscInfo                   :: !RemoteSchemaInfo
   , _rscRawIntrospectionResult :: !BL.ByteString
-  -- ^ The raw response from the introspection query against the remote server,
-  -- or the serialized customized introspection result if there are schema customizations.
+  -- ^ The raw response from the introspection query against the remote server.
   -- We store this so we can efficiently service 'introspect_remote_schema'.
   , _rscParsed                 ::  ParsedIntrospection -- ^ FieldParsers with schema customizations applied
   , _rscPermissions            :: !(M.HashMap RoleName IntrospectionResult)
@@ -464,7 +464,7 @@ instance (Monoid w, CacheRM m) => CacheRM (WriterT w m) where
   askSchemaCache = lift askSchemaCache
 instance (CacheRM m) => CacheRM (TraceT m) where
   askSchemaCache = lift askSchemaCache
-instance (CacheRM m) => CacheRM (PG.LazyTxT QErr m) where
+instance (CacheRM m) => CacheRM (Q.TxET QErr m) where
   askSchemaCache = lift askSchemaCache
 
 getDependentObjs :: SchemaCache -> SchemaObjId -> [SchemaObjId]

@@ -12,6 +12,7 @@ import           Data.Aeson.Extended
 import qualified Hasura.SQL.AnyBackend               as AB
 import qualified Hasura.Tracing                      as Tracing
 
+import qualified Database.PG.Query                   as Q
 import           Hasura.Backends.Postgres.Connection
 import           Hasura.Base.Error
 import           Hasura.RQL.IR.BoolExp
@@ -97,5 +98,13 @@ instance (MonadResolveSource m) => MonadResolveSource (ReaderT r m) where
 instance (MonadResolveSource m) => MonadResolveSource (Tracing.TraceT m) where
   getSourceResolver = lift getSourceResolver
 
-instance (MonadResolveSource m) => MonadResolveSource (LazyTxT QErr m) where
+instance (MonadResolveSource m) => MonadResolveSource (Q.TxET QErr m) where
   getSourceResolver = lift getSourceResolver
+
+data MaintenanceModeVersion
+  = PreviousMMVersion
+  -- ^ should correspond to the source catalog version from which the user
+  -- is migrating from
+  | CurrentMMVersion
+  -- ^ should correspond to the latest source catalog version
+  deriving (Show, Eq)

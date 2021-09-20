@@ -43,7 +43,7 @@ import           Data.Proxy
 import           Data.Text.Extended
 import           Data.These                               (These (..))
 import           Data.Time.Clock                          (getCurrentTime)
-import           Network.HTTP.Client.Extended             hiding (Proxy)
+import           Network.HTTP.Client.Manager              (HasHttpManagerM (..))
 
 import qualified Hasura.Incremental                       as Inc
 import qualified Hasura.SQL.AnyBackend                    as AB
@@ -71,6 +71,7 @@ import           Hasura.RQL.DDL.Schema.Cache.Permission
 import           Hasura.RQL.DDL.Schema.Function
 import           Hasura.RQL.DDL.Schema.Table
 import           Hasura.RQL.Types                         hiding (fmFunction, tmTable)
+import           Hasura.RQL.Types.Eventing.Backend
 import           Hasura.RQL.Types.Roles.Internal          (CheckPermission (..))
 import           Hasura.SQL.Tag
 import           Hasura.Server.Types                      (ExperimentalFeature (..),
@@ -368,7 +369,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
               maintenanceMode <- _sccMaintenanceMode <$> askServerConfigCtx
               let
                   initCatalogAction =
-                    runExceptT $ runLazyTx (_pscExecCtx sc) Q.ReadWrite (initCatalogForSource maintenanceMode migrationTime)
+                    runExceptT $ runTx (_pscExecCtx sc) Q.ReadWrite (initCatalogForSource maintenanceMode migrationTime)
               -- The `initCatalogForSource` action is retried here because
               -- in cloud there will be multiple workers (graphql-engine instances)
               -- trying to migrate the source catalog, when needed. This introduces
@@ -403,6 +404,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
          , MonadError QErr m
          , MonadReader BuildReason m
          , BackendMetadata b
+         , BackendEventTrigger b
          )
       => ( HashMap SourceName (AB.AnyBackend PartiallyResolvedSource)
          , SourceMetadata b
@@ -575,7 +577,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
       -- first we resolve them, and build the table cache
       partiallyResolvedSources <-
         (| Inc.keyed (\_ exists ->
-             AB.dispatchAnyBackendArrow @BackendMetadata (proc (sourceMetadata, invalidationKeys) -> do
+             AB.dispatchAnyBackendArrow @BackendMetadata @BackendMetadata (proc (sourceMetadata, invalidationKeys) -> do
                let
                  sourceName = _smName sourceMetadata
                  sourceInvalidationsKeys = Inc.selectD #_ikSources invalidationKeys
@@ -603,7 +605,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
       -- we need to have the table cache of all sources to build cross-sources relationships
       sourcesOutput <-
         (| Inc.keyed (\_ exists ->
-             AB.dispatchAnyBackendArrow @BackendMetadata (
+             AB.dispatchAnyBackendArrow @BackendMetadata @BackendEventTrigger (
                proc ( partiallyResolvedSource :: PartiallyResolvedSource b
                     , (allResolvedSources, invalidationKeys, remoteSchemaCtxMap, orderedRoles)
                     ) -> do
@@ -745,8 +747,8 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
       in MetadataObject (MOCronTrigger (ctName catalogCronTrigger))
                         definition
 
-    mkActionMetadataObject (ActionMetadata name comment defn _) =
-      MetadataObject (MOAction name) (toJSON $ CreateAction name defn comment)
+    mkActionMetadataObject (ActionMetadata name comment defn _ metadataTransform) =
+      MetadataObject (MOAction name) (toJSON $ CreateAction name defn comment metadataTransform)
 
     mkRemoteSchemaMetadataObject remoteSchema =
       MetadataObject (MORemoteSchema (_rsmName remoteSchema)) (toJSON remoteSchema)
@@ -803,7 +805,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
       :: forall arr m b
        . ( ArrowChoice arr, Inc.ArrowDistribute arr, ArrowWriter (Seq CollectedInfo) arr
          , Inc.ArrowCache m arr, MonadIO m, MonadError QErr m, MonadBaseControl IO m
-         , MonadReader BuildReason m, HasServerConfigCtx m, BackendMetadata b)
+         , MonadReader BuildReason m, HasServerConfigCtx m, BackendMetadata b, BackendEventTrigger b)
       => ( SourceName, SourceConfig b, TableCoreInfo b
          , [EventTriggerConf b], Inc.Dependency Inc.InvalidationKey
          , RecreateEventTriggers
@@ -900,7 +902,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
     buildActions = buildInfoMap _amName mkActionMetadataObject buildAction
       where
         buildAction = proc ((resolvedCustomTypes, scalarsMap, orderedRoles), action) -> do
-          let ActionMetadata name comment def actionPermissions = action
+          let ActionMetadata name comment def actionPermissions metadataTransform = action
               addActionContext e = "in action " <> name <<> "; " <> e
           (| withRecordInconsistency (
              (| modifyErrA (do
@@ -911,7 +913,7 @@ buildSchemaCacheRule env = proc (metadata, invalidationKeys) -> do
                       permissionsMap = mkBooleanPermissionMap ActionPermissionInfo metadataPermissionMap orderedRoles
                       forwardClientHeaders = _adForwardClientHeaders resolvedDef
                       outputType = unGraphQLType $ _adOutputType def
-                  returnA -< ActionInfo name (outputType, outObject) resolvedDef permissionsMap forwardClientHeaders comment)
+                  returnA -< ActionInfo name (outputType, outObject) resolvedDef permissionsMap forwardClientHeaders comment metadataTransform)
               |) addActionContext)
            |) (mkActionMetadataObject action)
 
