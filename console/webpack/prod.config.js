@@ -186,6 +186,7 @@ module.exports = {
       'process.env': {
         // Useful to reduce the size of client-side libraries, e.g. react
         NODE_ENV: JSON.stringify('production'),
+        DATA_API_URL: 'Something fishy',
       },
       CONSOLE_ASSET_VERSION: Date.now().toString(),
     }),

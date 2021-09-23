@@ -19,7 +19,7 @@ import qualified Database.PG.Query          as Q
 import qualified Network.HTTP.Client        as HTTP
 import qualified Network.HTTP.Client.TLS    as HTTP
 import qualified Network.Wai.Handler.Warp   as Warp
-import qualified System.Posix.Signals       as Signals
+-- import qualified System.Posix.Signals       as Signals
 
 import           Hasura.Db
 import           Hasura.EncJSON
@@ -165,7 +165,7 @@ main =  do
       let warpSettings = Warp.setPort port
                        . Warp.setHost host
                        . Warp.setGracefulShutdownTimeout (Just 30) -- 30s graceful shutdown
-                       . Warp.setInstallShutdownHandler (shutdownHandler logger shutdownApp)
+                       -- . Warp.setInstallShutdownHandler (shutdownHandler logger shutdownApp)
                        $ Warp.defaultSettings
 
       maxEvThrds <- getFromEnv defaultMaxEventThreads "HASURA_GRAPHQL_EVENTS_HTTP_POOL_SIZE"
@@ -286,21 +286,7 @@ main =  do
     -- requests is already implemented in Warp, and is triggered by invoking the 'closeSocket' callback.
     -- We only catch the SIGTERM signal once, that is, if the user hits CTRL-C once again, we terminate
     -- the process immediately.
-    shutdownHandler :: Logger -> IO () -> IO () -> IO ()
-    shutdownHandler (Logger logger) shutdownApp closeSocket =
-      void $ Signals.installHandler
-        Signals.sigTERM
-        (Signals.CatchOnce shutdownSequence)
-        Nothing
-     where
-      shutdownSequence = do
-        closeSocket
-        shutdownApp
-        logShutdown
-
-      logShutdown = logger $
-        mkGenericStrLog LevelInfo "server" "gracefully shutting down server"
-
+    
 telemetryNotice :: String
 telemetryNotice =
   "Help us improve Hasura! The graphql-engine server collects anonymized "

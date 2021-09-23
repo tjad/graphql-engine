@@ -16,7 +16,9 @@ import           Hasura.Server.Utils (getValFromEnvOrScript)
 
 version :: T.Text
 version = T.dropWhileEnd (== '\n')
-  $(getValFromEnvOrScript "VERSION" "../scripts/get-version.sh")
+  "v1.0.0-beta.9"
+  -- $(getValFromEnvOrScript "VERSION" "../scripts/get-version.sh")
+  --"master-5832adae-dirty" -- 
 
 parsedVersion :: Either String V.Version
 parsedVersion = V.fromText $ T.dropWhile (== 'v') version

@@ -345,7 +345,6 @@ executable graphql-engine
                      , wreq
                      , string-conversions
                      , uuid
-                     , unix
 
 test-suite graphql-engine-tests
   import: common-all, common-exe
